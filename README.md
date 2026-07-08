@@ -1,6 +1,24 @@
-# AI-powered complaint intelligence backend
+# AirWatch AI
 
-A high-performance backend for managing real-time complaints.
+<div style="display: flex; justify-content: center; align-items: center; padding: 20px;">
+  <img
+    src="https://res.cloudinary.com/dq53c9400/image/upload/v1783527775/airwatchai-dashboard_egvsuj.png"
+    alt="WindScope mascot"
+    style="
+      width: 800px;
+      height: 550px;
+      border-radius: 20px;
+      object-fit: cover;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    "
+  />
+</div>
+
+> A high-performance backend for managing real-time complaints.
+
+AI-powered complaint intelligence backend that ingests multilingual pollution complaints (Hindi, English, Hinglish), processes them through an AI pipeline, detects duplicates, automatically creates and escalates tickets, and exposes hotspot analytics.
+
+---
 
 ## Prerequisites
 
@@ -43,7 +61,7 @@ A high-performance backend for managing real-time complaints.
    { "status": "ok", "node": "Uxyz101", "metadata": null }
    ```
 
-4. Dashboard
+4. **Dashboard**
 
 Access web app dashboard @ **<http://localhost:3000>**
 
