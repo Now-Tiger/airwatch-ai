@@ -15,6 +15,7 @@ class Settings(BaseSettings):
 
     ENV: str
     LOG_LEVEL: str
+    WEB_APP_URL: str
 
     DATABASE_URL: str
     REDIS_URL: str

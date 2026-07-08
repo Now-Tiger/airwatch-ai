@@ -17,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 
 from api.routers import admin, analytics, complaints, health, tickets
+from core.config import settings
 from core.exceptions import ConflictError, InternalServerError, NotFoundError, ValidationError
 from core.logging import setup_logging
 from docs.apidesc import API_DESCRIPTION
@@ -61,7 +62,7 @@ app.mount("/metrics", metrics_app)
 # Add cors middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[settings.WEB_APP_URL,],
     allow_methods=["*"],
     allow_headers=["*"],
 )
