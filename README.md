@@ -1,15 +1,16 @@
 # AirWatch AI
 
-<div style="display: flex; justify-content: center; align-items: center; padding: 20px;">
+<div align="center">
   <img
     src="https://res.cloudinary.com/dq53c9400/image/upload/v1783527775/airwatchai-dashboard_egvsuj.png"
-    alt="WindScope mascot"
+    alt="AirWatch AI Dashboard"
     style="
-      width: 800px;
-      height: 550px;
+      width: 100%;
+      max-width: 1000px;
+      height: auto;
       border-radius: 20px;
-      object-fit: cover;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      display: block;
     "
   />
 </div>
