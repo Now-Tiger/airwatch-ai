@@ -1,0 +1,25 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "High thoughput backend"
+readme = "README.md"
+requires-python = ">=3.14.0"
+dependencies = [
+  "alembic>=1.18.5",
+  "asyncpg>=0.31.0",
+  "celery>=5.6.3",
+  "fastapi>=0.139.0",
+  "geoalchemy2>=0.20.0",
+  "httpx>=0.28.1",
+  "loguru>=0.7.3",
+  "nh3>=0.3.6",
+  "openai>=2.44.0",
+  "prometheus-client>=0.25.0",
+  "pydantic>=2.13.4",
+  "pydantic-settings>=2.14.2",
+  "python-dotenv>=1.2.2",
+  "redis>=8.0.1",
+  "sqlalchemy[asyncio]>=2.0.51",
+  "tenacity>=9.1.4",
+  "uvicorn[standard]>=0.50.2",
+]

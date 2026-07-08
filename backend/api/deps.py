@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# backend/api/deps.py
+from __future__ import annotations
+
+from typing import Annotated
+
+from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from db.session import get_session
+
+DbSession = Annotated[AsyncSession, Depends(get_session)]
