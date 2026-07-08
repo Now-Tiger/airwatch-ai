@@ -1,0 +1,25 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+:root {
+  --bg: #f7f8f6;
+  --surface: #ffffff;
+  --ink: #14181b;
+  --muted: #5b6570;
+  --border: #e2e5e1;
+  --accent: #0f6e5e;
+  --alert: #c1432a;
+  --warn: #b8862b;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+.font-mono-data {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}

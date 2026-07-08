@@ -1,0 +1,35 @@
+# Dependencies
+node_modules
+bun.lockb
+
+# Build output
+dist
+.output
+.vercel
+.netlify
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# IDE/Editor files
+.vscode
+.idea
+.DS_Store
+
+# Version control
+.git
+.gitattributes
+.gitignore
+
+# Testing and docs
+coverage
+.nyc_output
+*.md
