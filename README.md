@@ -2,6 +2,103 @@
 
 A high-performance backend for managing real-time complaints.
 
+## Prerequisites
+
+- Docker & Docker Compose
+- [`uv`](https://docs.astral.sh/uv/) (only needed if running a service outside Docker)
+- Make
+
+## Setup
+
+1. **Clone and configure environment**
+
+   ```bash
+   git clone https://github.com/Now-Tiger/airwatch-ai.git && cd airwatch-ai
+   cp .env.example .env
+   cp backend/.env.example backend/.env
+   cp worker/.env.example worker/.env
+   ```
+
+   Edit `.env` and set a real `OPENAI_API_KEY` & `OPENAI_BASE_URL`.
+
+2. **Start infrastructure and services**
+
+   ```bash
+   make up
+   # OR
+   docker compose up -d
+   ```
+
+   This builds and starts `postgres`, `redis`, `rabbitmq`, `backend`, `worker`, and `gateway`.
+
+3. **Verify health**
+
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+   Expected:
+
+   ```json
+   { "status": "ok", "node": "Uxyz101", "metadata": null }
+   ```
+
+4. Dashboard
+
+Access web app dashboard @ **<http://localhost:3000>**
+
+## Usage
+
+```bash
+# Ingest data: Add a complaint
+curl -X 'POST' \
+  'http://localhost:8000/complaints' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "text": "बहुत धुआं आ रहा है factory se near Anand Vihar, saans lena mushkil",
+  "location": {
+    "lat": 28.646,
+    "lng": 77.316,
+    "area": "Anand Vihar"
+  },
+  "photo_url": "https://example-url.com",
+  "channel": "web",
+  "submitted_at": "2026-07-07T18:17:59.671Z"
+}'
+
+# Get tickets
+curl -X 'GET' \
+  'http://localhost:8000/tickets' \
+  -H 'accept: application/json'
+
+# Update a ticket
+curl -X 'PATCH' \
+  'http://localhost:8000/tickets/55bf1038-d59b-408d-9378-4fd6bfcac7e7/status' \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "status": "In Progress",
+  "actor": "admin"
+}'
+
+# Get analytics
+curl -X 'GET' \
+  'http://localhost:8000/analytics/hotspots?hours_back=24' \
+  -H 'accept: application/json'
+```
+
+**Interactive API docs (Swagger)**: **<http://localhost:8000/docs>**
+**Use dashboard to perform actions @ <http://localhost:30000>**
+
+## Logs & Observability
+
+```bash
+make logs                                    # all services, tailed
+docker compose logs -f backend               # structured request logs (loguru, JSON)
+docker compose logs -f worker                # CSV ingestion / fraud-flag recompute logs
+```
+
 ## Core Features
 
 - **AI Complaint Ingestion**: Accept pollution complaints from multiple channels (Web, Mobile, Social) in Hindi, English, or Hinglish through a single API and validate the incoming data before processing.
