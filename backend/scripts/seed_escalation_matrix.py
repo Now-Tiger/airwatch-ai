@@ -2,12 +2,14 @@
 # -*- coding: utf-8 -*-
 # backend/scripts/seed_escalation_matrix.py
 import asyncio
+
 from loguru import logger
 from sqlalchemy import select
 
 from core.logging import setup_logging
 from db.models import Category, EscalationMatrix
 from db.session import AsyncSessionLocal
+
 
 SEED = [
     ("Industrial Emission", 1, "Field Inspector - Zone A", "+91-9000000001"),
@@ -34,16 +36,11 @@ async def main():
 
         # Renders in standard white/blue depending on your terminal theme
         logger.info("Seeding escalation matrix...")
+
         for category, tier, name, contact in SEED:
-            db.add(
-                EscalationMatrix(
-                    category=Category(category),
-                    tier=tier,
-                    officer_name=name,
-                    officer_contact=contact,
-                )
-            )
-        await db.commit()
+            _ = db.add(EscalationMatrix(category=Category(category), tier=tier, officer_name=name, officer_contact=contact))
+
+        _ = await db.commit()
         # Renders in bold green by default
         logger.success("Escalation matrix seeded successfully.")
 

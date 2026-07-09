@@ -129,4 +129,4 @@ def downgrade() -> None:
     # ### end Alembic commands ###
 
     # Safely remove the extension after dependent tables are removed
-    op.execute("DROP EXTENSION IF EXISTS postgis;")
+    # op.execute("DROP EXTENSION IF EXISTS postgis;")

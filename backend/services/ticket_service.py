@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from sqlalchemy import select
 
 from core.config import settings
 from db.models import Complaint, EscalationMatrix, Ticket, TicketAudit, TicketStatus
+from db.session import DbSession
 
 # Mapping operational priority tiers to dynamic SLA durations managed by environment configurations
 SLA_SECONDS_BY_TIER = {
@@ -29,7 +31,7 @@ class TicketService:
     and systemic audit trails for complaints pushed from the AI ingestion engine.
     """
 
-    def __init__(self, db):
+    def __init__(self, db: DbSession):
         """Initializes the TicketService with an asynchronous SQLAlchemy session.
 
         Args:
@@ -37,7 +39,7 @@ class TicketService:
         """
         self.db = db
 
-    async def _get_officer(self, category, tier: int) -> EscalationMatrix | None:
+    async def _get_officer(self, category, tier: int) -> Optional[EscalationMatrix]:
         """
         Looks up the designated responder from the organizational escalation matrix.
 

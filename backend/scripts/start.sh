@@ -6,6 +6,7 @@ alembic upgrade head
 
 echo "Running database seeders..."
 python -m scripts.seed_escalation_matrix
+python -m scripts.seed_officers
 
 echo "Starting API..."
 exec uvicorn main:app --host 0.0.0.0 --port 8000

@@ -46,3 +46,23 @@ async def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, db: 
     await db.refresh(ticket)
     
     return Envelope(success=True, data=TicketOut.model_validate(ticket))
+
+
+@router.post("/{ticket_id}/escalate", response_model=Envelope[TicketOut])
+async def escalate_ticket_new(ticket_id: str, db: DbSession) -> Envelope:
+    """
+    Manually escalates a ticket to the next configured escalation tier and reassigns it
+    to the appropriate officer. Returns the updated escalation details on success.
+    """
+    ticket = await db.get(Ticket, ticket_id)
+    if not ticket:
+        raise NotFoundError('Ticket not found')
+
+    service = TicketService(db)
+    _ = await service.escalate(ticket)
+
+    await db.flush()
+    await db.refresh(ticket)
+
+    return Envelope(success=True, data=TicketOut.model_validate(ticket))
+

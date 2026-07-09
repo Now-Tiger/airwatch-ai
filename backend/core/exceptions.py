@@ -6,6 +6,10 @@ from __future__ import annotations
 from fastapi import HTTPException, status
 
 
+class QueueError(RuntimeError):
+    """Raised when a background task cannot be submitted."""
+
+
 class ApplicationException(HTTPException):
     """
     Base application exception.

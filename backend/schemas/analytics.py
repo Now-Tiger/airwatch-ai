@@ -6,17 +6,37 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 
-class HotspotBucket(BaseModel):
+class HotspotResponse(BaseModel):
 
-    category: str
-    area: str | None
-    time_bucket: str  # ISO-truncated hour, e.g. "2026-07-07T10:00:00"
-    complaint_count: int
-    urgent_count: int
+    summary: SummaryStats
+    top_hotspots: list[HotspotArea]
+    category_breakdown: list[CategoryBreakdown]
+    timeline: list[TimelineBucket]
+    generated_at: str
+
+
+class SummaryStats(BaseModel):
+
+    total_complaints: int
+    urgent_complaints: int
     avg_priority_score: float
 
 
-class HotspotResponse(BaseModel):
+class HotspotArea(BaseModel):
 
-    buckets: list[HotspotBucket]
-    generated_at: str
+    area: str
+    complaints: int
+    urgent: int
+
+
+class CategoryBreakdown(BaseModel):
+
+    category: str
+    complaints: int
+
+
+class TimelineBucket(BaseModel):
+
+    time_bucket: str
+    complaints: int
+    urgent: int

@@ -11,12 +11,14 @@ from db.models import Channel
 
 
 class LocationIn(BaseModel):
+
     lat: float
     lng: float
     area: str | None = None
 
 
 class ComplaintIn(BaseModel):
+
     text: str = Field(..., min_length=3, max_length=4000)
     location: LocationIn
     photo_url: str | None = None
@@ -32,6 +34,7 @@ class ComplaintIn(BaseModel):
 
 
 class ComplaintOut(BaseModel):
+
     id: str
     category: str | None
     sub_category: str | None
@@ -49,3 +52,11 @@ class ComplaintOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ComplaintAsyncOut(BaseModel):
+
+    id: str
+    processing_status: str
+    task_id: str
+    message: str = "Complaint received. AI processing enqueued."

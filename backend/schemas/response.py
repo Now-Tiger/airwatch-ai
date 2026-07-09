@@ -11,7 +11,10 @@ T = TypeVar("T")
 
 
 class Envelope(BaseModel, Generic[T]):
-
+    """
+    A standardized API response wrapper containing the 
+    serialized ayload on success, or error details on failure.
+    """
     success: bool
     data: T | None = None
     error: str | None = None
