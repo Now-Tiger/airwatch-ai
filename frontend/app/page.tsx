@@ -2,55 +2,20 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
-
-import {
-  ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
-
-import { Ticket, ComplaintResponseData, HotspotBucket } from "@/lib/types";
+import { Ticket, ComplaintResponseData } from "@/lib/types";
 import {
   submitComplaintApi,
   fetchTicketsApi,
   updateTicketStatusApi,
-  fetchHotspotsApi,
   simulateSlaEscalation,
+  escalateTicketApi,
 } from "@/lib/api";
 
+import CRMDashboard from "@/components/analytics/CRMDashboard";
 
-// Define the shadcn chart configuration for clean color mapping and legend labels
-const hotspotChartConfig = {
-  complaint_count: {
-    label: "Total Complaints",
-    color: "#3b82f6", // blue-500
-  },
-  urgent_count: {
-    label: "Urgent Cases",
-    color: "#e11d48", // rose-600
-  },
-  avg_priority_score: {
-    label: "Avg Priority Score (Intensity)",
-    color: "#d97706", // amber-600
-  },
-} satisfies ChartConfig;
-
-export default function CRMDashboard() {
+export default function App() {
   // State
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [hotspots, setHotspots] = useState<HotspotBucket[]>([]);
-  // const [complaintText, setComplaintText] = useState<string>("बहुत धुआं आ रहा है factory se near Anand Vihar, saans lena mushkil ho raha hai",);
   const [complaintText, setComplaintText] = useState("");
   const [area, setArea] = useState("Anand Vihar");
   const [lat, setLat] = useState("28.646");
@@ -67,29 +32,29 @@ export default function CRMDashboard() {
   // Load initial data
   useEffect(() => {
     async function loadData() {
-      const [ticketsRes, hotspotsRes] = await Promise.all([
-        fetchTicketsApi(),
-        fetchHotspotsApi(),
-      ]);
-      if (ticketsRes.success) setTickets(ticketsRes.data);
-      if (hotspotsRes.success) setHotspots(hotspotsRes.data.buckets);
+      try {
+        const [ticketsRes] = await Promise.all([
+          fetchTicketsApi(),
+          // fetchHotspotsApi(),
+        ]);
+        if (ticketsRes.success) setTickets(ticketsRes.data);
+        // if (hotspotsRes.success) setHotspots(hotspotsRes.data.buckets);
+      } catch (error) {
+        console.error("Failed to load initial data:", error);
+      }
     }
     loadData();
   }, []);
 
   useEffect(() => {
-    // 1. Defer initial update to an async animation frame callback
-    // This satisfies the compiler and prevents a cascading sync render pass
     const frameId = requestAnimationFrame(() => {
       setNow(Date.now());
     });
-  
-    // 2. Keep the SLA clock ticking inside an asynchronous timer callback
+
     const intervalId = setInterval(() => {
       setNow(Date.now());
     }, 1000);
-  
-    // 3. Clean up both asynchronous references smoothly
+
     return () => {
       cancelAnimationFrame(frameId);
       clearInterval(intervalId);
@@ -97,59 +62,54 @@ export default function CRMDashboard() {
   }, []);
 
   // Handlers
-  const handleComplaintSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-  e.preventDefault();
-  if (!complaintText.trim()) return;
-  
-  setIsSubmitting(true);
+  const handleComplaintSubmit = async (
+    e: React.SubmitEvent<HTMLFormElement>,
+  ) => {
+    e.preventDefault();
+    if (!complaintText.trim()) return;
 
-  // 1. Construct the exact payload matching your backend ComplaintIn schema
-  const payload = {
-    text: complaintText.trim(),
-    location: {
-      lat: parseFloat(lat) || 0.0,
-      lng: parseFloat(lng) || 0.0,
-      area: area.trim() || "Unknown Area",
-    },
-    photo_url: photoUrl.trim() || null,
-    channel: channel,
-    submitted_at: new Date().toISOString(),
-  };
+    setIsSubmitting(true);
 
-  try {
-    // 2. Pass the structured payload object instead of just the text string
-    const res = await submitComplaintApi(payload);
-    
-    if (res.success) {
-      setAiOutput(res.data);
-      
-      if (res.data.ticket_id) {
-        const newTicket: Ticket = {
-          id: res.data.ticket_id, // Clean string assignment, no errors!
-          complaint_id: res.data.id,
-          status: "Open",
-          priority_tier: res.data.priority_tier as Ticket['priority_tier'], 
-          category: res.data.category,
-          current_tier: 1,
-          assigned_officer_name: "Field Inspector - Zone A",
-          assigned_officer_contact: "+91-9000000001",
-          sla_deadline: new Date(Date.now() + 30 * 60000).toISOString(),
-          created_at: new Date().toISOString(),
-        };
-    
-        setTickets((prev) => [newTicket, ...prev]);
-      } 
-      // Optional: Clear form inputs after a successful submission
-      // setComplaintText("");
-      // setPhotoUrl("");
+    const payload = {
+      text: complaintText.trim(),
+      location: {
+        lat: parseFloat(lat) || 0.0,
+        lng: parseFloat(lng) || 0.0,
+        area: area.trim() || "Unknown Area",
+      },
+      photo_url: photoUrl.trim() || null,
+      channel: channel,
+      submitted_at: new Date().toISOString(),
+    };
+
+    try {
+      const res = await submitComplaintApi(payload);
+
+      if (res.success) {
+        setAiOutput(res.data);
+        if (res.data.ticket_id) {
+          const newTicket: Ticket = {
+            id: res.data.ticket_id,
+            complaint_id: res.data.id,
+            status: "Open",
+            priority_tier: res.data.priority_tier as Ticket["priority_tier"],
+            category: res.data.category,
+            current_tier: 1,
+            assigned_officer_name: "Field Inspector - Zone A",
+            assigned_officer_contact: "+91-9000000001",
+            sla_deadline: new Date(Date.now() + 30 * 60000).toISOString(),
+            created_at: new Date().toISOString(),
+          };
+
+          setTickets((prev) => [newTicket, ...prev]);
+        }
+      }
+    } catch (error) {
+      console.error("Error submitting complaint:", error);
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (error) {
-    console.error("Error submitting complaint:", error);
-  } finally {
-    // 3. Ensure loading state always resets even if the API call fails
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
     setTickets((prev) =>
@@ -176,254 +136,162 @@ export default function CRMDashboard() {
     return true;
   });
 
+  const handleEscalate = async (ticketId: string) => {
+    const response = await escalateTicketApi(ticketId);
+
+    if (!response.success || !response.data) {
+      console.error(response.error);
+      return;
+    }
+
+    const updatedTicket = response.data;
+
+    setTickets((prev) =>
+      prev.map((ticket) =>
+        ticket.id === ticketId
+          ? {
+              ...ticket,
+              status: updatedTicket.status,
+              current_tier: updatedTicket.current_tier,
+              assigned_officer_name: updatedTicket.assigned_officer_name,
+              assigned_officer_contact: updatedTicket.assigned_officer_contact,
+              sla_deadline: updatedTicket.sla_deadline,
+            }
+          : ticket,
+      ),
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 font-sans pb-12">
       {/* Top Navigation matching reference image */}
       <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200/80 py-3.5">
-      {/* Inner container constraining navbar items to match the <main> max-w-7xl alignment */}
-      <div className="max-w-7xl mx-auto px-6 w-full flex items-center justify-between">
-        
-        {/* Left Group: Branding + Navigation */}
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold tracking-wider shadow-sm shadow-blue-500/20">
-              AW
-            </div>
-            <span className="font-semibold text-lg tracking-tight text-slate-900">
-              AirWatch{" "}
-              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                DPCC CRM
+        <div className="max-w-7xl mx-auto px-6 w-full flex items-center justify-between">
+          {/* Left Group: Branding + Navigation */}
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold tracking-wider shadow-sm shadow-blue-500/20">
+                AW
+              </div>
+              <span className="font-semibold text-lg tracking-tight text-slate-900">
+                AirWatch{" "}
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  DPCC CRM
+                </span>
               </span>
-            </span>
-          </div>
-    
-          {/* 2. Pill Navigation */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-full border border-slate-200/60">
-            {["Overview", "Complaints", "Tickets", "Hotspots"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
-                  activeTab === tab
-                    ? "bg-white text-slate-900 shadow-sm font-semibold"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </nav>
-        </div>
-    
-        {/* 3. Right Controls & SLA Clock Simulator */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-full">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-            </span>
-            <span className="text-xs font-medium text-amber-900">
-              SLA Clock:{" "}
-              <strong className="font-semibold">+{simulatedTimeOffset}m</strong>
-            </span>
-            <button
-              onClick={() => handleAdvanceTime(30)}
-              className="ml-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-0.5 rounded transition-colors shadow-2xs"
-              title="Fast-forward time by 30 mins to trigger SLA breaches and re-assign officers"
-            >
-              +30m Skip
-            </button>
-          </div>
-    
-          <div className="h-8 w-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-xs font-bold text-slate-600">
-            SN
-          </div>
-        </div>
-    
-      </div>
-    </header>
-
-    <main className="max-w-7xl mx-auto px-6 mt-6 space-y-6">
-      {/* Top Summary Metric Cards */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <span className="text-sm font-medium text-slate-500">
-              Active Complaints
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
-              +14 today
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-slate-900">
-              34
-            </span>
-            <span className="text-xs text-slate-400">Anand Vihar Peak</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <span className="text-sm font-medium text-slate-500">
-              SLA Breaches (24h)
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200/60">
-              Action Req
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-slate-900">
-              {tickets.filter((t) => t.current_tier > 1).length}
-            </span>
-            <span className="text-xs text-slate-400">
-              Auto-escalated to Tier 2/3
-            </span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <span className="text-sm font-medium text-slate-500">
-              Avg Triage Speed
-            </span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200/60">
-              LLM V2
-            </span>
-          </div>
-          <div className="mt-4 flex items-baseline justify-between">
-            <span className="text-3xl font-bold tracking-tight text-slate-900">
-              1.2s
-            </span>
-            <span className="text-xs text-slate-400">
-              Real-time processing
-            </span>
-          </div>
-        </div>
-      </section>
-
-        {/* Main Workspace Layout matching reference ratio (~65% left / ~35% right)[cite: 1] */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* LEFT COLUMN: Hotspot Analytics & Tickets Table (~8 cols)[cite: 1] */}
-          <div className="lg:col-span-8 space-y-6">
-            {/* NOTE: CHANGE BELOW: 1. Hotspot & Emission Intensity (MAPPED FROM REVENUE ANALYTICS)[cite: 1] */}
-            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">
-                    Emission Hotspots & Intensity
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Real-time aggregation from DPCC IoT sensors & web complaints
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-slate-500">Window:</span>
-                  <select className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20">
-                    <option>Last 24 Hours</option>
-                    <option>Last 7 Days</option>
-                  </select>
-                </div>
-              </div>
-            
-              {/* Unified Analytical shadcn/ui Chart */}
-              <div className="pt-2">
-                <ChartContainer config={hotspotChartConfig} className="h-80 w-full">
-                  <ComposedChart
-                    data={hotspots}
-                    margin={{ top: 10, right: 10, left: -15, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      vertical={false}
-                      strokeDasharray="3 3"
-                      className="stroke-slate-200/60"
-                    />
-                    
-                    {/* X-Axis: Displays Area Names */}
-                    <XAxis
-                      dataKey="area"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: "#64748b", fontSize: 12 }}
-                      dy={8}
-                    />
-            
-                    {/* Left Y-Axis: Complaint Counts */}
-                    <YAxis
-                      yAxisId="left"
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: "#64748b", fontSize: 12 }}
-                      allowDecimals={false}
-                    />
-            
-                    {/* Right Y-Axis: Priority Score (0 to 100 Scale) */}
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={[0, 100]}
-                      tickLine={false}
-                      axisLine={false}
-                      tick={{ fill: "#d97706", fontSize: 12, fontWeight: 500 }}
-                      unit=" pts"
-                    />
-            
-                    {/* Rich shadcn Tooltip showing Category metadata + accurate values */}
-                    <ChartTooltip
-                      content={
-                        <ChartTooltipContent
-                          indicator="dot"
-                          labelFormatter={(value, payload) => {
-                            const item = payload?.[0]?.payload as HotspotBucket | undefined;
-                            return (
-                              <div className="flex items-center gap-2 font-semibold text-slate-900 pb-1 border-b border-slate-100">
-                                <span>{value}</span>
-                                {item && (
-                                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                                    {item.category}
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          }}
-                        />
-                      }
-                    />
-            
-                    <ChartLegend content={<ChartLegendContent />} />
-            
-                    {/* Volume Bars (Left Axis) */}
-                    <Bar
-                      yAxisId="left"
-                      dataKey="complaint_count"
-                      fill="var(--color-complaint_count)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={36}
-                    />
-                    <Bar
-                      yAxisId="left"
-                      dataKey="urgent_count"
-                      fill="var(--color-urgent_count)"
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={36}
-                    />
-            
-                    {/* Intensity Trend Line (Right Axis) */}
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="avg_priority_score"
-                      stroke="var(--color-avg_priority_score)"
-                      strokeWidth={2.5}
-                      dot={{ r: 4, fill: "var(--color-avg_priority_score)", strokeWidth: 0 }}
-                      activeDot={{ r: 6, stroke: "#fff", strokeWidth: 2 }}
-                    />
-                  </ComposedChart>
-                </ChartContainer>
-              </div>
             </div>
 
-            {/* 2. Manage Tickets Table (MAPPED FROM MANAGE PROJECTS)[cite: 1] */}
+            {/* Pill Navigation */}
+            <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-full border border-slate-200/60">
+              {["Overview", "Complaints", "Tickets", "Hotspots"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                    activeTab === tab
+                      ? "bg-white text-slate-900 shadow-sm font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Right Controls & SLA Clock Simulator */}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-full">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span className="text-xs font-medium text-amber-900">
+                SLA Clock:{" "}
+                <strong className="font-semibold">
+                  +{simulatedTimeOffset}m
+                </strong>
+              </span>
+              <button
+                onClick={() => handleAdvanceTime(30)}
+                className="ml-1 text-xs bg-amber-500 hover:bg-amber-600 text-white font-medium px-2 py-0.5 rounded transition-colors shadow-2xs"
+                title="Fast-forward time by 30 mins to trigger SLA breaches and re-assign officers"
+              >
+                +30m Skip
+              </button>
+            </div>
+
+            <div className="h-8 w-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-xs font-bold text-slate-600">
+              SN
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-6 mt-6 space-y-6">
+        {/* Top Summary Metric Cards */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <span className="text-sm font-medium text-slate-500">
+                Active Complaints
+              </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                +14 today
+              </span>
+            </div>
+            <div className="mt-4 flex items-baseline justify-between">
+              <span className="text-3xl font-bold tracking-tight text-slate-900">
+                34
+              </span>
+              <span className="text-xs text-slate-400">Anand Vihar Peak</span>
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <span className="text-sm font-medium text-slate-500">
+                SLA Breaches (24h)
+              </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200/60">
+                Action Req
+              </span>
+            </div>
+            <div className="mt-4 flex items-baseline justify-between">
+              <span className="text-3xl font-bold tracking-tight text-slate-900">
+                {tickets.filter((t) => t.current_tier > 1).length}
+              </span>
+              <span className="text-xs text-slate-400">
+                Auto-escalated to Tier 2/3
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between">
+            <div className="flex justify-between items-start">
+              <span className="text-sm font-medium text-slate-500">
+                Avg Triage Speed
+              </span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200/60">
+                LLM V2
+              </span>
+            </div>
+            <div className="mt-4 flex items-baseline justify-between">
+              <span className="text-3xl font-bold tracking-tight text-slate-900">
+                1.2s
+              </span>
+              <span className="text-xs text-slate-400">
+                Real-time processing
+              </span>
+            </div>
+          </div>
+        </section>
+
+        {/* Main Workspace Layout (~65% left / ~35% right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* LEFT COLUMN: Hotspot Analytics & Tickets Table (~8 cols) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Manage Tickets Table */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
@@ -435,7 +303,7 @@ export default function CRMDashboard() {
                   </p>
                 </div>
 
-                {/* Table Filter Tabs[cite: 1] */}
+                {/* Table Filter Tabs */}
                 <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs font-medium">
                   {["All", "P1 Urgent", "In Progress", "Escalated"].map(
                     (tab) => (
@@ -469,7 +337,8 @@ export default function CRMDashboard() {
                   <tbody className="divide-y divide-slate-100 text-xs">
                     <AnimatePresence>
                       {filteredTickets.map((t) => {
-                        const isBreached = now > 0 && new Date(t.sla_deadline).getTime() < now;
+                        const isBreached =
+                          now > 0 && new Date(t.sla_deadline).getTime() < now;
                         return (
                           <motion.tr
                             key={t.id}
@@ -558,9 +427,17 @@ export default function CRMDashboard() {
                                   <option value="Closed">Closed</option>
                                 </select>
                                 <button
-                                  onClick={() => handleAdvanceTime(45)}
-                                  className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium px-2 py-1 rounded-lg transition-colors border border-slate-200/80"
-                                  title="Force 45m time skip to test automated escalation matrix"
+                                  disabled={
+                                    t.status === "Escalated" &&
+                                    t.current_tier >= 3
+                                  }
+                                  onClick={() => handleEscalate(t.id)}
+                                  className={`text-[11px] px-2 py-1 rounded-lg border transition-colors ${
+                                    t.status === "Escalated" &&
+                                    t.current_tier >= 3
+                                      ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                      : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200/80"
+                                  }`}
                                 >
                                   Escalate
                                 </button>
@@ -574,11 +451,19 @@ export default function CRMDashboard() {
                 </table>
               </div>
             </div>
+
+            {/* GRACEFULLY REPLACED: Hotspot & Emission Intensity replaced with CRMDashboard */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs w-full overflow-hidden">
+              {/* CRMDashboard Component Injected Here */}
+              <div className="bg-white w-full">
+                <CRMDashboard />
+              </div>
+            </div>
           </div>
 
-          {/* RIGHT COLUMN: Active Escalations & AI Assistant (~4 cols)[cite: 1] */}
+          {/* RIGHT COLUMN: Active Escalations & AI Assistant (~4 cols) */}
           <div className="lg:col-span-4 space-y-6">
-            {/* 1. Priority Tasks / SLA Escalation Watch (MAPPED FROM PRIORITY TASKS)[cite: 1] */}
+            {/* Escalation Watch */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-semibold text-slate-900">
@@ -623,7 +508,7 @@ export default function CRMDashboard() {
               </div>
             </div>
 
-            {/* 2. AI Complaint Intake Box (MAPPED FROM "HOW CAN I HELP YOU?" AI BOX)[cite: 1] */}
+            {/* AI Complaint Intake Box */}
             <div className="bg-linear-to-b from-blue-50/50 to-white p-6 rounded-2xl border border-blue-100/80 shadow-sm relative overflow-hidden">
               <div className="flex items-center gap-2 mb-2">
                 <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold shadow-xs shadow-blue-500/30">
@@ -634,13 +519,12 @@ export default function CRMDashboard() {
                 </h2>
               </div>
               <p className="text-xs text-slate-500 mb-4">
-                Paste raw citizen reports in Hindi/English. The AI reasoning engine
-                extracts entities, scores priority, and runs deduplication.
+                Paste raw citizen reports in Hindi/English. The AI reasoning
+                engine extracts entities, scores priority, and runs
+                deduplication.
               </p>
 
-              {/* UPDATED FORM: Clean, responsive grid layout preserving exact heights & widths */}
               <form onSubmit={handleComplaintSubmit} className="space-y-3">
-                {/* Main Complaint Text */}
                 <textarea
                   rows={3}
                   value={complaintText}
@@ -675,30 +559,24 @@ export default function CRMDashboard() {
                   </div>
                 </div>
 
-                {/* Coordinates & Photo URL Row */}
+                {/* Coordinates & Photo URL Row (COMPLETED FROM TRUNCATION) */}
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-1">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
                       value={lat}
                       onChange={(e) => setLat(e.target.value)}
                       placeholder="Lat"
-                      title="Latitude"
-                      className="w-full text-xs p-2.5 rounded-xl bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset font-mono"
-                      required
+                      className="w-full text-xs h-9 px-2 rounded-sm bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset"
                     />
                   </div>
                   <div className="col-span-1">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
                       value={lng}
                       onChange={(e) => setLng(e.target.value)}
                       placeholder="Lng"
-                      title="Longitude"
-                      className="w-full text-xs p-2.5 rounded-xl bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset font-mono"
-                      required
+                      className="w-full text-xs h-9 px-2 rounded-sm bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset"
                     />
                   </div>
                   <div className="col-span-2">
@@ -707,28 +585,21 @@ export default function CRMDashboard() {
                       value={photoUrl}
                       onChange={(e) => setPhotoUrl(e.target.value)}
                       placeholder="Photo URL (Optional)"
-                      className="w-full text-xs p-2.5 rounded-xl bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset"
+                      className="w-full text-xs h-9 px-3 rounded-sm bg-white border border-slate-200/80 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-hidden text-slate-800 placeholder:text-slate-400 shadow-inset"
                     />
                   </div>
                 </div>
 
-                {/* Submit Button */}
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium text-xs rounded-sm shadow-xs shadow-blue-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+                  className="w-full h-9 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-xs rounded-sm shadow-sm transition-colors flex items-center justify-center gap-2"
                 >
-                  {isSubmitting ? (
-                    <>
-                      <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      Running AI Triage...
-                    </>
-                  ) : (
-                    "Submit & Run AI Triage"
-                  )}
+                  {isSubmitting
+                    ? "Processing AI Triage..."
+                    : "Triage Complaint"}
                 </button>
               </form>
-
               {/* AI Output Card Display */}
               <AnimatePresence>
                 {aiOutput && (
@@ -760,7 +631,7 @@ export default function CRMDashboard() {
                         <span className="text-slate-400 text-[11px] block">
                           Priority Score
                         </span>
-                      <span className="font-semibold text-rose-600">
+                        <span className="font-semibold text-rose-600">
                           {aiOutput.priority_score} ({aiOutput.priority_tier})
                         </span>
                       </div>

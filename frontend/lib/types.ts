@@ -79,3 +79,33 @@ export interface EscalationMatrixRule {
   officer_name: string;
   officer_contact: string;
 }
+
+export interface AnalyticsData {
+  summary: {
+    total_complaints: number;
+    urgent_complaints: number;
+    avg_priority_score: number;
+  };
+  top_hotspots: Array<{
+    area: string;
+    complaints: number;
+    urgent: number;
+  }>;
+  category_breakdown: Array<{
+    category: string;
+    complaints: number;
+  }>;
+  timeline: Array<{
+    time_bucket: string;
+    complaints: number;
+    urgent: number;
+  }>;
+  generated_at: string;
+}
+
+// Add this wrapper interface to represent the top-level API JSON structure
+export interface AnalyticsApiResponse {
+  success: boolean;
+  data: AnalyticsData;
+  error: string | null;
+}
