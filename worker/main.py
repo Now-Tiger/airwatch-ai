@@ -25,7 +25,7 @@ app.conf.update(
 )
 
 app.conf.task_routes = {
-    "tasks.ai_tasks.*": {"queue": "ai_pipeline"},
+    "tasks.ai_tasks.*" : {"queue": "ai_pipeline"},
     "tasks.sla_tasks.*": {"queue": "sla"},
 }
 

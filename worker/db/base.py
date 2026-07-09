@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # worker/db/base.py
-from sqlalchemy import MetaData
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import MetaData, create_engine
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from core.config import settings
 
-DATABASE_URL = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+DATABASE_URL = settings.DATABASE_URL
 
-engine = create_async_engine(
+if DATABASE_URL.startswith("postgresql+asyncpg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+
+engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
     pool_size=10,  # NOTE: Match this to the worker's concurrency
     max_overflow=20,
-    future=True,
+    pool_pre_ping=True,
 )
 
-AsyncSessionLocal = async_sessionmaker(
+SessionLocal = sessionmaker(
     bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False, # Essential for background workers to avoid detached object errors
     autocommit=False,
     autoflush=False,
+    expire_on_commit=False, # Essential for background workers to avoid detached object errors
 )
 
 # Pro-tip naming convention for Alembic constraint tracking

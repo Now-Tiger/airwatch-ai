@@ -37,7 +37,7 @@ class TicketService:
         """
         self.db = db
 
-    async def _get_officer(self, category, tier: int) -> EscalationMatrix | None:
+    def _get_officer(self, category, tier: int) -> EscalationMatrix | None:
         """
         Looks up the designated responder from the organizational escalation matrix.
 
@@ -53,9 +53,9 @@ class TicketService:
             and contact profiles if configured, else None.
         """
         stmt = select(EscalationMatrix).where(EscalationMatrix.category == category, EscalationMatrix.tier == tier)
-        return (await self.db.execute(stmt)).scalar_one_or_none()
+        return (self.db.execute(stmt)).scalar_one_or_none()
 
-    async def create_for_complaint(self, complaint: Complaint) -> Ticket:
+    def create_for_complaint(self, complaint: Complaint) -> Ticket:
         """
         Spins up an operational tracking ticket bound to an processed AI complaint structure.
 
@@ -70,7 +70,7 @@ class TicketService:
             Ticket: The newly instantiated, flushed database record.
         """
         # Default routing targeting foundational operations tier
-        officer = await self._get_officer(complaint.category, tier=1)
+        officer = self._get_officer(complaint.category, tier=1)
         current_tier = complaint.priority_tier
         
         # Safe attribute extraction regardless of whether tier is Enum, string, or None
@@ -92,7 +92,7 @@ class TicketService:
         )
 
         self.db.add(ticket)
-        await self.db.flush()  # Extract primary keys safely without executing full commit boundary
+        self.db.flush()  # Extract primary keys safely without executing full commit boundary
 
         # Create system checkpoint documenting foundational lifecycle creation step
         self.db.add(TicketAudit(
@@ -108,7 +108,7 @@ class TicketService:
 
         return ticket
 
-    async def escalate(self, ticket: Ticket) -> None:
+    def escalate(self, ticket: Ticket) -> None:
         """
         Escalates a ticket horizontally to the next managerial structural tier.
 
@@ -120,7 +120,7 @@ class TicketService:
             ticket (Ticket): The target tracking entity currently experiencing a breach.
         """
         next_tier = ticket.current_tier + 1
-        officer = await self._get_officer(ticket.category, tier=next_tier)
+        officer = self._get_officer(ticket.category, tier=next_tier)
 
         # Retain state snapshots before processing transitions
         from_status = getattr(ticket.status, "value", ticket.status)
@@ -148,7 +148,7 @@ class TicketService:
             actor="system",
         ))
 
-    async def update_status(self, ticket: Ticket, new_status: str, actor: str) -> None:
+    def update_status(self, ticket: Ticket, new_status: str, actor: str) -> None:
         """
         Modifies status bounds manually via interactive supervisor actions.
 
@@ -179,7 +179,7 @@ class TicketService:
             actor=actor,
         ))
 
-    async def run_sla_check(self) -> int:
+    def run_sla_check(self) -> int:
         """
         Shared by Celery Beat (worker/tasks/sla_tasks.py) and the manual
         /admin/sla/check endpoint — single source of truth for SLA breach logic.
@@ -192,8 +192,8 @@ class TicketService:
             ]),
             Ticket.sla_deadline < now
         )
-        result = await self.db.execute(stmt)
+        result = self.db.execute(stmt)
         breached = result.scalars().all()
         for ticket in breached:
-            await self.escalate(ticket)
+            self.escalate(ticket)
         return len(breached)

@@ -3,22 +3,21 @@
 # worker/tasks/sla_tasks.py
 from __future__ import annotations
 
-from db.base import AsyncSessionLocal
+from db.base import SessionLocal
 from main import app
-from tasks.base import async_task
+from services.ticket_service import TicketService
 
 
-async def _check_sla_breaches_async() -> int:
-    from services.ticket_service import TicketService
-
-    async with AsyncSessionLocal() as db:
+def _check_sla_breaches() -> int:
+    db = SessionLocal()
+    try:
         service = TicketService(db)
-        count = await service.run_sla_check()
-        _ = await db.commit()
+        count   = service.run_sla_check()
         return count
+    finally:
+        db.close()
 
 
-@app.task(name="tasks.sla_task.check_sla_breaches")
-@async_task
-async def check_sla_breaches():
-    return await _check_sla_breaches_async()
+@app.task(name="tasks.sla_tasks.check_sla_breaches")
+def check_sla_breaches() -> int:
+    return _check_sla_breaches()

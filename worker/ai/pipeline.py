@@ -60,14 +60,14 @@ class ComplaintAIPipeline:
         retry=retry_if_exception_type(Exception),
         reraise=True,
     )
-    async def _run_primary(self, text: str, meta: dict) -> AIResult:
+    def _run_primary(self, text: str, meta: dict) -> AIResult:
         """
         Execute structured single-pass analysis over the active LLM implementation layer.
         """
-        category  = await self.primary.categorize(text, meta)
-        sentiment = await self.primary.analyze_sentiment(text, meta)
-        score     = await self.primary.score_priority(text, meta, category, sentiment)
-        entities  = await self.primary.extract_entities(text, meta)
+        category  = self.primary.categorize(text, meta)
+        sentiment = self.primary.analyze_sentiment(text, meta)
+        score     = self.primary.score_priority(text, meta, category, sentiment)
+        entities  = self.primary.extract_entities(text, meta)
 
         # Access internal memoized state payload to save tracking debug logs
         raw = getattr(self.primary, "_last_payload", None)
@@ -84,12 +84,12 @@ class ComplaintAIPipeline:
             raw=raw,
         )
 
-    async def process(self, text: str, meta: dict) -> AIResult:
+    def process(self, text: str, meta: dict) -> AIResult:
         """
         Orchestrate primary processing path with circuit-breaker execution boundaries.
         """
         try:
-            return await self._run_primary(text, meta)
+            return self._run_primary(text, meta)
         except Exception:
             # Fallback path runs locally with zero-network dependencies on primary failure
-            return await self.fallback.full_process(text, meta)
+            return self.fallback.full_process(text, meta)

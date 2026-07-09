@@ -32,7 +32,7 @@ class RuleBasedClassifier(ComplaintClassifier):
     ensuring graceful degradation when the LLM client encounters rate limits or timeouts.
     """
 
-    async def categorize(self, text: str, meta: Optional[dict] = None) -> CategoryResult:
+    def categorize(self, text: str, meta: Optional[dict] = None) -> CategoryResult:
         """
         Scan input against localized token sets to guess primary environmental domain.
         """
@@ -42,7 +42,7 @@ class RuleBasedClassifier(ComplaintClassifier):
                 return CategoryResult(category=category, confidence=0.6)
         return CategoryResult(category="Other", confidence=0.3)
 
-    async def analyze_sentiment(self, text: str, meta: Optional[dict] = None) -> SentimentResult:
+    def analyze_sentiment(self, text: str, meta: Optional[dict] = None) -> SentimentResult:
         """
         Evaluate systemic emergency indicators by running multi-lingual regex match matrices.
         """
@@ -50,7 +50,7 @@ class RuleBasedClassifier(ComplaintClassifier):
         label = "distressed" if is_urgent else "neutral"
         return SentimentResult(label=label, is_urgent=is_urgent, health_risk_detected=is_urgent)
 
-    async def score_priority(self, text, meta, category, sentiment) -> int:
+    def score_priority(self, text, meta, category, sentiment) -> int:
         """
         Calculate weighted numerical risk thresholds using static business logic matrices.
         """
@@ -63,23 +63,23 @@ class RuleBasedClassifier(ComplaintClassifier):
             score -= 5
         return max(0, min(100, score))
 
-    async def extract_entities(self, text: str, meta: Optional[dict] = None) -> Entities:
+    def extract_entities(self, text: str, meta: Optional[dict] = None) -> Entities:
         """
         Parse structured metrics, metric units, and temporal bounds via alphanumeric regex patterns.
         """
         quantities = re.findall(r"\d+\s?(?:hours?|din|minutes?|ppm|db)", text, re.IGNORECASE)
         return Entities(quantities=quantities)
 
-    async def full_process(self, text: str, meta: dict):
+    def full_process(self, text: str, meta: dict):
         """
         Orchestrate synchronous local extraction to provide zero-latency structural fallbacks.
         """
         from ai.pipeline import AIResult, tier_from_score
 
-        category = await self.categorize(text)
-        sentiment = await self.analyze_sentiment(text)
-        score = await self.score_priority(text, meta, category, sentiment)
-        entities = await self.extract_entities(text)
+        category  = self.categorize(text)
+        sentiment = self.analyze_sentiment(text)
+        score     = self.score_priority(text, meta, category, sentiment)
+        entities  = self.extract_entities(text)
 
         return AIResult(
             category=category.category, 

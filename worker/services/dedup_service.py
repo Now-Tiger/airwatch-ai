@@ -38,7 +38,7 @@ class DedupService:
         """
         self.db = db
 
-    async def find_and_link(self, complaint: Complaint) -> DedupResult:
+    def find_and_link(self, complaint: Complaint) -> DedupResult:
         """
         Scan historical records for an active root parent and increment its corroboration weight.
 
@@ -65,7 +65,7 @@ class DedupService:
             .limit(1)
         )
 
-        result = await self.db.execute(stmt)
+        result    = self.db.execute(stmt)
         candidate = result.scalar_one_or_none()
 
         # Exit early as a unique incident if no spatial match passes thresholds
@@ -76,12 +76,12 @@ class DedupService:
         complaint.parent_complaint_id = candidate.id
 
         # Atomic structural increment of parent corroboration telemetry counters
-        await self.db.execute(
+        self.db.execute(
             update(Complaint)
             .where(Complaint.id == candidate.id)
             .values(corroboration_count=Complaint.corroboration_count + 1))
-        await self.db.flush()
-        await self.db.refresh(candidate)
+        self.db.flush()
+        self.db.refresh(candidate)
 
         return DedupResult(
             is_duplicate=True,
