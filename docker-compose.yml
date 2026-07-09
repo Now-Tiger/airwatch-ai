@@ -60,7 +60,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d {POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -93,7 +93,6 @@ services:
       context: ./worker
       dockerfile: Dockerfile
     container_name: worker
-    image: claimmesh-worker:latest
     env_file:
       - ./worker/.env
     environment:
@@ -107,6 +106,27 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+  beat:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile.beat
+    container_name: beat
+    image: airwatch-beat:latest
+    env_file:
+      - ./worker/.env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
 
   # notification-service:
   #   build:
