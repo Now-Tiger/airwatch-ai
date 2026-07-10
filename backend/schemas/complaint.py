@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -14,14 +15,14 @@ class LocationIn(BaseModel):
 
     lat: float
     lng: float
-    area: str | None = None
+    area: Optional[str] = None
 
 
 class ComplaintIn(BaseModel):
 
     text: str = Field(..., min_length=3, max_length=4000)
     location: LocationIn
-    photo_url: str | None = None
+    photo_url: Optional[str] = None
     channel: Channel
     submitted_at: datetime
 
@@ -36,19 +37,45 @@ class ComplaintIn(BaseModel):
 class ComplaintOut(BaseModel):
 
     id: str
-    category: str | None
-    sub_category: str | None
-    priority_score: int | None
-    priority_tier: str | None
-    is_urgent: bool
-    sentiment_label: str | None
-    entities: dict | None
-    ai_source: str | None
+    raw_text: Optional[str]  = None
+    ai_source: Optional[str] = None
+    ai_raw_response: Optional[str | dict] = None
+
+    category: Optional[str] = None
+    sub_category: Optional[str]   = None
+    priority_score: Optional[int] = None
+    priority_tier: Optional[str]  = None
+    is_urgent: bool = False
+    sentiment_label: Optional[str] = None 
+
     processing_status: str
-    is_duplicate: bool
-    parent_complaint_id: str | None
-    corroboration_count: int | None
-    ticket_id: str | None
+
+    is_duplicate: bool = False
+    parent_complaint_id: Optional[str] = None
+    corroboration_count: Optional[int] = None
+    ticket_id: Optional[str] = None
+
+    entities: Optional[dict] = None
+
+    @field_validator(
+        "id",
+        "category",
+        "sub_category",
+        "priority_tier",
+        "parent_complaint_id",
+        "corroboration_count",
+        "ticket_id",
+        mode="before",
+    )
+    @classmethod
+    def coerce_to_string(cls, value: Any) -> Any:
+        """
+        Safely converts UUID objects and SQLAlchemy Enum descriptors into standard strings
+        to satisfy Pydantic v2 strict type validation during from_attributes conversion.
+        """
+        if value is None:
+            return None
+        return getattr(value, "value", str(value))
 
     class Config:
         from_attributes = True
