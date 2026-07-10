@@ -6,10 +6,16 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
+from loguru import logger
 from sqlalchemy import select
 
 from core.config import settings
+from core.logging import setup_logging
 from db.models import Complaint, EscalationMatrix, Ticket, TicketAudit, TicketStatus
+
+# Init logger
+_ = setup_logging()
+
 
 # Mapping operational priority tiers to dynamic SLA durations managed by environment configurations
 SLA_SECONDS_BY_TIER = {
@@ -72,7 +78,7 @@ class TicketService:
         # Default routing targeting foundational operations tier
         officer = self._get_officer(complaint.category, tier=1)
         current_tier = complaint.priority_tier
-        
+
         # Safe attribute extraction regardless of whether tier is Enum, string, or None
         tier_key = getattr(current_tier, "value", current_tier) if current_tier else "P4"
         sla_seconds = SLA_SECONDS_BY_TIER.get(str(tier_key), settings.SLA_P3_SECONDS)
@@ -106,6 +112,7 @@ class TicketService:
             actor="system",
         ))
 
+        logger.info(f"Created ticket {ticket.id} for complaint {complaint.id}")
         return ticket
 
     def escalate(self, ticket: Ticket) -> None:
@@ -125,12 +132,15 @@ class TicketService:
         # Retain state snapshots before processing transitions
         from_status = getattr(ticket.status, "value", ticket.status)
         from_tier = ticket.current_tier
-        
+
         # If a higher organizational tier is explicitly defined, shift responsibility
         if officer:
             ticket.current_tier = next_tier
             ticket.assigned_officer_name = officer.officer_name
             ticket.assigned_officer_contact = officer.officer_contact
+            logger.info(f"Escalating ticket {ticket.id} to Tier {next_tier} (Officer: {officer.officer_name})")
+        else:
+            logger.info(f"Escalating ticket {ticket.id} to max tier (No higher officer available)")
 
         # If no upper tier exists, remain locked at maximum tier depth but flag state as escalated
         ticket.status = TicketStatus.escalated
@@ -194,6 +204,8 @@ class TicketService:
         )
         result = self.db.execute(stmt)
         breached = result.scalars().all()
+
         for ticket in breached:
             self.escalate(ticket)
+
         return len(breached)

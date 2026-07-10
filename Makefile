@@ -58,13 +58,38 @@ restart-worker: ## Restart worker service
 	@echo "$(YELLOW)Restarting worker service...$(NC)"
 	docker compose restart worker
 
-restart-beat: ## Restart beat-service
+restart-beat: ## Restart beat service
 	@echo "$(YELLOW)Restarting beat service...$(NC)"
 	docker compose restart beat
 
-restart-notification: ## Restart notification-service
+restart-notification: ## Restart notification service
 	@echo "$(YELLOW)Restarting notification-service...$(NC)"
 	docker compose restart notification-service
+
+restart-backend-scratch: ## Build & restart backend service
+	@echo "$(YELLOW)Stopping backend service...$(NC)"
+	docker compose down backend
+	@echo "$(GREEN)Starting backend services...$(NC)"
+	docker compose build --no-cache backend
+	docker compose up -d backend
+	@echo "$(GREEN)Backend service built successfully...$(NC)"
+
+restart-worker-scratch: ## Build & worker backend service
+	@echo "$(YELLOW)Stopping backend service...$(NC)"
+	docker compose down worker
+	@echo "$(GREEN)Starting backend services...$(NC)"
+	docker compose build --no-cache worker
+	docker compose up -d worker
+	@echo "$(GREEN)Worker service built successfully...$(NC)"
+
+restart-beat-scratch: ## Build & restart beat service
+	@echo "$(YELLOW)Stopping beat service...$(NC)"
+	docker compose down beat
+	@echo "$(GREEN)Starting beat services...$(NC)"
+	docker compose build --no-cache beat
+	docker compose up -d beat
+	@echo "$(GREEN)Logging beat services...$(NC)"
+	docker compose logs -f beat
 
 rebuild: ## Clean rebuild from scratch
 	@echo "$(RED)Removing containers and volumes...$(NC)"
@@ -83,6 +108,9 @@ logs-backend: ## Follow backend logs
 
 logs-worker: ## Follow worker logs
 	docker compose logs -f worker
+
+logs-beat: ## Follow celery-beat logs
+	docker compose logs -f beat
 
 logs-notification: ## Follow notification-service logs
 	docker compose logs -f notification-service
