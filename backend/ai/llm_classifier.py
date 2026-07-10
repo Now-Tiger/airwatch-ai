@@ -5,17 +5,27 @@ from __future__ import annotations
 
 import json
 from typing import Optional
-from openai import AsyncOpenAI
 
-from core.config import settings
-from ai.interface import ComplaintClassifier, CategoryResult, SentimentResult, Entities
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    AuthenticationError,
+    BadRequestError,
+    InternalServerError,
+    RateLimitError,
+)
+
+from ai.interface import CategoryResult, ComplaintClassifier, Entities, SentimentResult
 from ai.prompts import SYSTEM_PROMPT, build_user_prompt
+from core.config import settings
+from core.exceptions import AIServiceUnavailable
 
 
 class LLMResultCache:
     """
     In-memory cache designed to prevent redundant LLM token ingestion.
-    
+
     Caches the combined parsed structural JSON payload generated from identical 
     complaint text and geographic metadata hashes.
     """
@@ -33,12 +43,25 @@ class LLMClassifier(ComplaintClassifier):
     """
 
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_BASE_URL,
-        )
+        self.client: AsyncOpenAI | None = None
         self._last_payload: dict | None = None
         self._last_key: tuple | None = None
+
+    def _get_client(self) -> AsyncOpenAI:
+        """
+        Delay client creation
+        """
+        if self.client is None:
+
+            if not settings.OPENAI_API_KEY:
+                raise AIServiceUnavailable("OPENAI_API_KEY missing...")
+
+            self.client = AsyncOpenAI(
+                api_key=settings.OPENAI_API_KEY,
+                base_url=settings.OPENAI_BASE_URL,
+            )
+
+        return self.client
 
     async def _call(self, text: str, meta: dict) -> dict:
         """
@@ -48,22 +71,50 @@ class LLMClassifier(ComplaintClassifier):
         """
         # Return internal memoized state if present to save token overhead across sub-service calls
         key = (text, meta.get("channel"), meta.get("area"))
+
         if self._last_payload is not None and self._last_key == key:
             return self._last_payload
 
-        resp = await self.client.chat.completions.create(
-            model=settings.OPENAI_MODEL,
-            temperature=0.1,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(text, meta)},
-            ],
-        )
+        try:
+            client   = self._get_client()
 
-        payload = json.loads(resp.choices[0].message.content)
+            response = await client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                temperature=0.1,
+                response_format={"type": "json_object"},
+                messages=[
+                    {
+                        "role": "system",
+                        "content": SYSTEM_PROMPT,
+                    },
+                    {
+                        "role": "user",
+                        "content": build_user_prompt(text, meta),
+                    },
+                ],
+            )
+
+        except (
+            AuthenticationError,
+            APIConnectionError,
+            APITimeoutError,
+            InternalServerError,
+            RateLimitError,
+            BadRequestError,
+        ) as exc:
+            raise AIServiceUnavailable(str(exc)) from exc
+
+        except Exception as exc:
+            raise AIServiceUnavailable(str(exc)) from exc
+
+        try:
+            payload = json.loads(response.choices[0].message.content)
+        except Exception as exc:
+            raise AIServiceUnavailable("Invalid JSON returned from LLM.") from exc
+
         self._last_payload = payload
         self._last_key = key
+
         return payload
 
     async def categorize(self, text: str, meta: Optional[dict] = None) -> CategoryResult:

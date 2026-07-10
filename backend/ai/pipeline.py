@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # backend/ai/pipeline.py
 from __future__ import annotations
+from typing import Any
 
 from pydantic import BaseModel
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
@@ -15,13 +16,14 @@ class AIResult(BaseModel):
     """
     Unified structural Pydantic model representing fully processed grievance metadata.
     """
+
     category: str
     sub_category: str | None
     priority_score: int
     priority_tier: str
     is_urgent: bool
     sentiment_label: str
-    entities: dict
+    entities: dict[str, Any]
     source: str  # Structural flag: "llm" | "rule_fallback"
     raw: dict | None
 
