@@ -3,22 +3,37 @@
 # backend/services/analytics_service.py
 from __future__ import annotations
 
+from loguru import logger
 from sqlalchemy import func, select
 
 from core.cache import cache_get, cache_set
+from core.logging import setup_logging
 from db.models import Complaint
+from db.session import DbSession
+
+# Init logger
+_ = setup_logging()
 
 
 class AnalyticsService:
-    def __init__(self, db):
+
+    def __init__(self, db: DbSession):
         self.db = db
 
     async def hotspots(self, hours_back: int = 24):
+        """
+        Generates analytics data for the dashboard, including high-frequency 
+        grievance areas (hotspots), category breakdowns, and timeline summaries.
+        """
         cache_key = f"hotspots:{hours_back}"
         cached = await cache_get(cache_key)
         if cached:
+            logger.success('Cache hit for analytics!')
             return cached
+        else:
+            logger.info('Cache miss for analytics!')
 
+        # Calculate the dynamic cutoff time once to use across all queries
         start_time = func.now() - func.make_interval(0, 0, 0, 0, hours_back)
 
         # Summary
@@ -37,11 +52,13 @@ class AnalyticsService:
         hotspot_stmt = (
             select(
                 Complaint.area,
+                Complaint.lat,
+                Complaint.lng,
                 func.count(Complaint.id).label("count"),
                 func.sum(func.cast(Complaint.is_urgent, type_=func.count().type)).label("urgent"),
             )
             .where(Complaint.submitted_at >= start_time)
-            .group_by(Complaint.area)
+            .group_by(Complaint.area, Complaint.lat, Complaint.lng,)
             .order_by(func.count(Complaint.id).desc())
             .limit(10)
         )
@@ -84,6 +101,8 @@ class AnalyticsService:
                     "area": r.area,
                     "complaints": r.count,
                     "urgent": int(r.urgent or 0),
+                    "lat": float(r.lat) if r.lat else 0.0,
+                    "lng": float(r.lng) if r.lng else 0.0,
                 }
                 for r in hotspots
             ],
@@ -104,6 +123,7 @@ class AnalyticsService:
             ],
         }
 
+        logger.info('Data cached for analytics...')
         await cache_set(cache_key, result, ttl=60)
 
         return result

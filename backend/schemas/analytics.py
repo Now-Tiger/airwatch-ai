@@ -27,6 +27,8 @@ class HotspotArea(BaseModel):
     area: str
     complaints: int
     urgent: int
+    lat: float
+    lng: float
 
 
 class CategoryBreakdown(BaseModel):
