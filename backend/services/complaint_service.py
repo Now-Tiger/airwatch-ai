@@ -128,7 +128,7 @@ class ComplaintService:
             ticket = await self.tickets.create_for_complaint(complaint)
             ticket_id = str(ticket.id)
 
-        # FIXED: Extracting descriptors into local variables guarantees Pyright's type-narrowing works
+        # Extracting descriptors into local variables guarantees Pyright's type-narrowing works
         current_category = complaint.category
         current_tier = complaint.priority_tier
 

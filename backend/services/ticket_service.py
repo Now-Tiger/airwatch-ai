@@ -7,11 +7,17 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from loguru import logger
 from sqlalchemy import select
 
 from core.config import settings
+from core.logging import setup_logging
 from db.models import Complaint, EscalationMatrix, Ticket, TicketAudit, TicketStatus
 from db.session import DbSession
+
+# Init logger
+_ = setup_logging()
+
 
 # Mapping operational priority tiers to dynamic SLA durations managed by environment configurations
 SLA_SECONDS_BY_TIER = {
@@ -74,7 +80,7 @@ class TicketService:
         # Default routing targeting foundational operations tier
         officer = await self._get_officer(complaint.category, tier=1)
         current_tier = complaint.priority_tier
-        
+
         # Safe attribute extraction regardless of whether tier is Enum, string, or None
         tier_key = getattr(current_tier, "value", current_tier) if current_tier else "P4"
         sla_seconds = SLA_SECONDS_BY_TIER.get(str(tier_key), settings.SLA_P3_SECONDS)
@@ -108,6 +114,7 @@ class TicketService:
             actor="system",
         ))
 
+        logger.info(f"Created ticket {ticket.id} for complaint {complaint.id}")
         return ticket
 
     async def escalate(self, ticket: Ticket) -> None:
@@ -133,6 +140,8 @@ class TicketService:
             ticket.current_tier = next_tier
             ticket.assigned_officer_name = officer.officer_name
             ticket.assigned_officer_contact = officer.officer_contact
+        else:
+            logger.info(f"Escalating ticket {ticket.id} to max tier (No higher officer available)")
 
         # If no upper tier exists, remain locked at maximum tier depth but flag state as escalated
         ticket.status = TicketStatus.escalated
@@ -190,12 +199,14 @@ class TicketService:
         stmt = select(Ticket).where(
             Ticket.status.in_([
                 TicketStatus.open,
-                TicketStatus.in_progress
+                TicketStatus.in_progress,
             ]),
             Ticket.sla_deadline < now
         )
         result   = await self.db.execute(stmt)
         breached = result.scalars().all()
+
         for ticket in breached:
             await self.escalate(ticket)
+
         return len(breached)
