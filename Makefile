@@ -38,12 +38,16 @@ down-backend: ## Stop backend service
 	@echo "$(YLLOW)Stopping backend service...$(NC)"
 	docker compose down backend
 
-down-worker:
-	@echo "$(YLLOW)Stopping backend service...$(NC)"
-	docker compose down backend
+down-worker: ## Stop worker service
+	@echo "$(YLLOW)Stopping worker service...$(NC)"
+	docker compose down worker
 
-down-notification:
-	@echo "$(YLLOW)Stopping backend service...$(NC)"
+down-beat: ## Stop beat service
+	@echo "$(YLLOW)Stopping beat service...$(NC)"
+	docker compose down beat
+
+down-notification: ## Stop notification service
+	@echo "$(YLLOW)Stopping notification service...$(NC)"
 	docker compose down notification-service
 
 restart-backend: ## Restart backend service
@@ -53,6 +57,10 @@ restart-backend: ## Restart backend service
 restart-worker: ## Restart worker service
 	@echo "$(YELLOW)Restarting worker service...$(NC)"
 	docker compose restart worker
+
+restart-beat: ## Restart beat-service
+	@echo "$(YELLOW)Restarting beat service...$(NC)"
+	docker compose restart beat
 
 restart-notification: ## Restart notification-service
 	@echo "$(YELLOW)Restarting notification-service...$(NC)"
