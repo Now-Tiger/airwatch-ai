@@ -7,10 +7,12 @@ import asyncio
 import uuid
 
 from geoalchemy2.functions import ST_MakePoint, ST_SetSRID
+from loguru import logger
 
 from ai.pipeline import ComplaintAIPipeline
 from core.config import settings
-from core.exceptions import NotFoundError
+from core.exceptions import AIServiceUnavailable, NotFoundError
+from core.logging import setup_logging
 from core.security import sanitize_text, validate_coordinates
 from db.models import Category, Complaint, PriorityTier, ProcessingStatus
 from db.session import DbSession
@@ -18,6 +20,10 @@ from schemas.complaint import ComplaintAsyncOut, ComplaintIn, ComplaintOut
 from services.dedup_service import DedupService
 from services.ticket_service import TicketService
 from workers.ai_tasks import enqueue_ai_pipeline
+
+
+# Init logger
+_ = setup_logging()
 
 
 class ComplaintService:
@@ -93,8 +99,9 @@ class ComplaintService:
             complaint.ai_raw_response   = ai_result.raw
             complaint.processing_status = ProcessingStatus.processed_llm if ai_result.source == "llm" else ProcessingStatus.processed_fallback
 
-        except Exception:
+        except (AIServiceUnavailable, asyncio.TimeoutError) as exc:
             # Hard fallback path mapping rule-based logic locally to maintain high availability
+            logger.warning("AI unavailable. Falling back to rule classifier.", exc_info=True)
             from ai.rule_classifier import RuleBasedClassifier
 
             fallback  = RuleBasedClassifier()
@@ -104,11 +111,12 @@ class ComplaintService:
             complaint.category = Category(ai_result.category) if ai_result.category else None
             complaint.sub_category = ai_result.sub_category
             complaint.priority_score = ai_result.priority_score
-            complaint.priority_tier = PriorityTier(ai_result.priority_tier) if ai_result.priority_tier else None
+            complaint.priority_tier  = PriorityTier(ai_result.priority_tier) if ai_result.priority_tier else None
             complaint.is_urgent = ai_result.is_urgent
             complaint.sentiment_label = ai_result.sentiment_label
-            complaint.entities = ai_result.entities
+            complaint.entities  = ai_result.entities
             complaint.ai_source = "rule_fallback"
+            complaint.ai_raw_response   = {'fallback': True, 'error': str(exc)}
             complaint.processing_status = ProcessingStatus.processed_fallback
 
         # --- Spatio-temporal deduplication routing check ---
@@ -134,6 +142,7 @@ class ComplaintService:
             sentiment_label=complaint.sentiment_label,
             entities=complaint.entities,
             ai_source=complaint.ai_source,
+            ai_raw_response=complaint.ai_raw_response,
             processing_status=complaint.processing_status.value,
             is_duplicate=dedup_result.is_duplicate,
             parent_complaint_id=str(dedup_result.parent_id) if dedup_result.parent_id else None,

@@ -127,7 +127,7 @@ class TicketService:
         # Retain state snapshots before processing transitions
         from_status = getattr(ticket.status, "value", ticket.status)
         from_tier = ticket.current_tier
-        
+
         # If a higher organizational tier is explicitly defined, shift responsibility
         if officer:
             ticket.current_tier = next_tier
