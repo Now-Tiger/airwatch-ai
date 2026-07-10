@@ -17,21 +17,18 @@ router = APIRouter(prefix="/complaints", tags=["complaints"])
 
 
 # NOTE: FIX THE DATA SERIALIZATION BUG BY DEFINING VALID OUTPUT
-# @router.get("/", response_model=Envelope)
-# async def get_complaints(db: DbSession):
-#     """
-#     Fetch all complaints sorted chronologically by creation date.
-#     """
-#     query  = (
-#         select(Complaint)
-#         .options(selectinload(Complaint.ticket))
-#         .order_by(Complaint.created_at.desc())
-#     )
-#     result = await db.execute(query)
-#     complaints = result.scalars().all()
-# 
-#     # Serialize database records into structured response schemas
-#     return Envelope(success=True, data=complaints)
+@router.get("/", response_model=Envelope[list[ComplaintOut]])
+async def get_complaints(db: DbSession):
+    """
+    Fetch all complaints sorted chronologically by creation date.
+    """
+    # query  = select(Complaint).options(selectinload(Complaint.ticket)).order_by(Complaint.created_at.desc())
+    query  = select(Complaint).order_by(Complaint.created_at.desc())
+    result = await db.execute(query)
+    complaints = result.scalars().all()
+
+    # Serialize database records into structured response schemas
+    return Envelope(success=True, data=[ComplaintOut.model_validate(c) for c in complaints])
 
 
 @router.post("", response_model=Envelope[ComplaintOut], status_code=201)
