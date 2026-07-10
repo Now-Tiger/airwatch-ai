@@ -10,6 +10,14 @@ class QueueError(RuntimeError):
     """Raised when a background task cannot be submitted."""
 
 
+class AIServiceUnavailable(Exception):
+    """
+    Raised whenever the configured AI provider cannot complete
+    the request and the pipeline should transparently fall back
+    to the rule-based classifier.
+    """
+
+
 class ApplicationException(HTTPException):
     """
     Base application exception.
