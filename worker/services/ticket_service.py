@@ -42,6 +42,8 @@ class TicketService:
             db: The active, scoped asynchronous database dependency session.
         """
         self.db = db
+        # n-memory cache to prevent N+1 DB queries during bulk escalations
+        self._officer_cache = {}
 
     def _get_officer(self, category, tier: int) -> EscalationMatrix | None:
         """
@@ -58,8 +60,17 @@ class TicketService:
             EscalationMatrix | None: Database record containing officer routing metadata 
             and contact profiles if configured, else None.
         """
-        stmt = select(EscalationMatrix).where(EscalationMatrix.category == category, EscalationMatrix.tier == tier)
-        return (self.db.execute(stmt)).scalar_one_or_none()
+        cache_key = (category, tier)
+
+        # NOTE: MOVE THIS INTO AN ACTUAL REDIS CACHE
+        # Check cache first to avoid redundant DB trips
+        if cache_key not in self._officer_cache:
+            logger.trace(f"Cache miss for Officer lookup: Category={category}, Tier={tier}. Querying DB.")
+
+            stmt = select(EscalationMatrix).where(EscalationMatrix.category == category, EscalationMatrix.tier == tier)
+            self._officer_cache[cache_key] = (self.db.execute(stmt)).scalar_one_or_none()
+
+        return self._officer_cache[cache_key]
 
     def create_for_complaint(self, complaint: Complaint) -> Ticket:
         """
@@ -189,7 +200,7 @@ class TicketService:
             actor=actor,
         ))
 
-    def run_sla_check(self) -> int:
+    def run_sla_check(self) -> list:
         """
         Shared by Celery Beat (worker/tasks/sla_tasks.py) and the manual
         /admin/sla/check endpoint — single source of truth for SLA breach logic.
@@ -205,7 +216,10 @@ class TicketService:
         result = self.db.execute(stmt)
         breached = result.scalars().all()
 
+        if breached:
+            logger.info(f"Found {len(breached)} tickets breaching SLA. Initiating escalation...")
+
         for ticket in breached:
             self.escalate(ticket)
 
-        return len(breached)
+        return breached

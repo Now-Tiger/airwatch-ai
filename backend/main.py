@@ -59,6 +59,22 @@ api_latency_histogram = Histogram(
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
+
+# Good (Safe for SSE):
+class PureASGIMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        # Process request safely without breaking the streaming response
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(PureASGIMiddleware)
+
+
 # Add cors middleware
 app.add_middleware(
     CORSMiddleware,
