@@ -1,7 +1,14 @@
-// "use client";
+import Dashboard from "@/components/analytics/DynamicMap";
+
+export default function DynamicMaps() {
+  return (
+    <>
+      <Dashboard />
+    </>
+  );
+}
 //
 // import React, { useState, useEffect } from "react";
-import Dashboard from "@/components/analytics/DynamicMap";
 // import { motion, AnimatePresence } from "framer-motion";
 // import { Ticket, ComplaintResponseData } from "@/lib/types";
 // import {
@@ -15,13 +22,6 @@ import Dashboard from "@/components/analytics/DynamicMap";
 //
 // import CRMDashboard from "@/components/analytics/CRMDashboard";
 //
-export default function App() {
-  return (
-    <>
-      <Dashboard />
-    </>
-  );
-}
 // export default function App() {
 //   // State
 //   const [tickets, setTickets] = useState<Ticket[]>([]);
