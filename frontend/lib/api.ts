@@ -8,7 +8,7 @@ import {
   AnalyticsApiResponse,
 } from "@/lib/types";
 
-const BASE_URL =
+export const BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 // Escalation Matrix fallback matching DB seed
@@ -210,26 +210,31 @@ export async function updateTicketStatusApi(
   }
 }
 
-export async function fetchHotspotsApi(timeWindow: string = "24h"): Promise<AnalyticsApiResponse> {
+export async function fetchHotspotsApi(
+  timeWindow: string = "24h",
+): Promise<AnalyticsApiResponse> {
   // 1. Map UI time window strings to the integer 'hours_back' parameter expected by the backend
   const hoursMap: Record<string, number> = {
     "12h": 12,
     "24h": 24,
-    "7d": 168,   // 7 days * 24 hours
-    "30d": 720,  // 30 days * 24 hours
+    "7d": 168, // 7 days * 24 hours
+    "30d": 720, // 30 days * 24 hours
   };
-  
+
   // Default to 24 hours if timeWindow is undefined or unrecognized
   const hoursBack = hoursMap[timeWindow] ?? 24;
 
   try {
     // 2. Use BASE_URL, the correct /analytics/ path, and the 'hours_back' query param
-    const response = await fetch(`${BASE_URL}/analytics/hotspots?hours_back=${hoursBack}`, {
-      method: "GET",
-      headers: {
-        accept: "application/json",
+    const response = await fetch(
+      `${BASE_URL}/analytics/hotspots?hours_back=${hoursBack}`,
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+        },
       },
-    });
+    );
 
     // 3. Prevent HTML/JSON syntax errors by verifying HTTP status before parsing
     if (!response.ok) {

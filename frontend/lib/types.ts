@@ -90,6 +90,8 @@ export interface AnalyticsData {
     area: string;
     complaints: number;
     urgent: number;
+    lat: number,
+    lng: number,
   }>;
   category_breakdown: Array<{
     category: string;
