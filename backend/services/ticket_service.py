@@ -3,13 +3,16 @@
 # backend/services/ticket_service.py
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from fastapi import Request
 from loguru import logger
 from sqlalchemy import select
 
+from core.cache import redis_client
 from core.config import settings
 from core.logging import setup_logging
 from db.models import Complaint, EscalationMatrix, Ticket, TicketAudit, TicketStatus
@@ -210,3 +213,46 @@ class TicketService:
             await self.escalate(ticket)
 
         return len(breached)
+
+
+async def ticket_event_generator(request: Request):
+        """
+        Generator function that connects to Redis Pub/Sub and yields events.
+        """
+        # Subscribe to the channel our Celery worker will broadcast on
+        channel = 'ticket_updates' 
+        pubsub  = redis_client.pubsub()
+        await pubsub.subscribe(channel)
+        logger.success(f'New SSE client connected and subscribed to {channel}.')
+
+        try:
+            while True:
+                # Crucial: Check if the React frontend closed the tab or disconnected
+                if await request.is_disconnected():
+                    logger.warning('Redis client disconnected. Closing SSE stream...')
+                    break
+
+                # Poll Redis for new messages. Timeout prevents the while loop from locking up.
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+
+                if msg and msg['type'] == 'message':
+                    logger.success(f'Recieved {msg["data"]} via pub-sub')
+                    payload = msg['data']
+
+                    # Yield the SSE standard format: "data: {json_string}\n\n"
+                    yield f"data: {payload}\n\n"
+
+        except asyncio.CancelledError:
+            # NORMAL BEHAVIOR: Catch the cancellation signal and log it as INFO, not ERROR
+            logger.info("SSE stream cancelled by client disconnect. Shutting down gracefully.")
+            # Do NOT re-raise this error or log it as an exception.
+
+        except Exception as exc:
+            # ACTUAL ERRORS: This catches database failures, redis timeouts, etc.
+            logger.error(f"Unexpected error in SSE stream: {exc}", exc_info=True)
+
+        finally:
+            # Always clean up the connection to prevent memory/connection leaks
+            await pubsub.unsubscribe(channel)
+            await pubsub.close()
+            await redis_client.close()

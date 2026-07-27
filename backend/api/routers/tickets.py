@@ -3,7 +3,8 @@
 # backend/routers/complaints.py
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from api.deps import DbSession
@@ -11,7 +12,7 @@ from core.exceptions import NotFoundError
 from db.models import Ticket
 from schemas.response import Envelope
 from schemas.ticket import TicketOut, TicketStatusUpdate
-from services.ticket_service import TicketService
+from services.ticket_service import TicketService, ticket_event_generator
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
@@ -36,15 +37,15 @@ async def update_ticket_status(ticket_id: str, payload: TicketStatusUpdate, db: 
     ticket = await db.get(Ticket, ticket_id)
     if not ticket:
         raise NotFoundError("Ticket not found")
-    
+
     # Delegate core status modification and immutable auditing to the service layer
     service = TicketService(db)
     await service.update_status(ticket, payload.status, payload.actor)
-    
+
     # FIXED: Use flush() instead of commit() to respect the DbSession transaction manager
     await db.flush()
     await db.refresh(ticket)
-    
+
     return Envelope(success=True, data=TicketOut.model_validate(ticket))
 
 
@@ -65,4 +66,22 @@ async def escalate_ticket_new(ticket_id: str, db: DbSession) -> Envelope:
     await db.refresh(ticket)
 
     return Envelope(success=True, data=TicketOut.model_validate(ticket))
+
+
+@router.get('/stream', status_code=202)
+async def stream_tickets(request: Request):
+    """
+    The endpoint React connects to via `new EventSource('/api/tickets/stream')`
+    """
+
+    return StreamingResponse(
+        ticket_event_generator(request),
+        media_type="text/event-stream",
+        # Cache control headers are essential for SSE to prevent proxies from buffering
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no" # Turns off buffering in NGINX
+        }
+    )
 
