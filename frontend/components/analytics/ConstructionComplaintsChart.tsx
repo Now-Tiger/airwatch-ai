@@ -18,13 +18,13 @@ import {
 // ---------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------
-type BubblePoint = {
+interface BubblePoint {
   district: string;
   constructionSites: number;
   citizenComplaints: number;
   builtUpArea: number;
   averageAQI: number;
-};
+}
 
 // Extracted data matching the precise visual layout of the image
 const data: BubblePoint[] = [
@@ -103,7 +103,7 @@ const data: BubblePoint[] = [
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function getAqiColor(aqi: number) {
+function getAqiColor(aqi: number): string {
   if (aqi < 220) return "#4BB2E6";
   if (aqi < 260) return "#4ED2C8";
   if (aqi < 290) return "#86E255";
@@ -114,12 +114,19 @@ function getAqiColor(aqi: number) {
   return "#8B2C27";
 }
 
-type TooltipProps = {
-  active?: boolean;
-  payload?: Array<{ payload: BubblePoint }>;
-};
+interface TooltipPayloadEntry {
+  payload: BubblePoint;
+}
 
-function CustomTooltip({ active, payload }: TooltipProps) {
+interface TooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+}
+
+function CustomTooltip({
+  active,
+  payload,
+}: TooltipProps): React.ReactElement | null {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
   return (
@@ -151,16 +158,15 @@ function CustomTooltip({ active, payload }: TooltipProps) {
   );
 }
 
-type CustomAnnotationProps = {
-  viewBox: {
-    cx: number;
-    cy: number;
-  };
-};
+interface CustomAnnotationProps {
+  cx: number;
+  cy: number;
+}
 
-function CustomAnnotation({ viewBox }: CustomAnnotationProps) {
-  const { cx, cy } = viewBox;
-
+function CustomAnnotation({
+  cx,
+  cy,
+}: CustomAnnotationProps): React.ReactElement | null {
   if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
   return (
     <g>
@@ -190,26 +196,62 @@ function CustomAnnotation({ viewBox }: CustomAnnotationProps) {
   );
 }
 
+// Minimal shape of the axis objects recharts hands to <Customized>. Recharts
+// does not export a public type for xAxisMap/yAxisMap entries, so we declare
+// only the members we actually use rather than reaching for `any`.
+interface ScaledAxis {
+  scale: (value: number) => number;
+}
+
+type AxisMap = Record<string, ScaledAxis>;
+
+// Recharts calls the <Customized> `component` render-prop with its own
+// internal chart state (formattedGraphicalItems, offset, width, height, ...)
+// in addition to xAxisMap/yAxisMap. We only care about the axis maps, but an
+// index signature keeps this type structurally compatible with whatever
+// (wider) props object recharts actually passes at runtime.
+interface CustomizedLayerProps {
+  xAxisMap?: AxisMap;
+  yAxisMap?: AxisMap;
+  [key: string]: unknown;
+}
+
 // Resolves the pixel position for a data-space (x, y) pair using the live
 // axis scales exposed by recharts' <Customized> render-prop. This avoids the
 // NaN x/y issues that come from relying on <Label>/<ReferenceDot> viewBox
 // interpolation, which expects width/height rather than cx/cy.
-function ChartAnnotationLayer({ xAxisMap, yAxisMap, dataX, dataY }) {
-  if (!xAxisMap || !yAxisMap) return null;
-  const xAxis = xAxisMap[Object.keys(xAxisMap)[0]];
-  const yAxis = yAxisMap[Object.keys(yAxisMap)[0]];
-  if (!xAxis || !yAxis) return null;
+//
+// dataX/dataY are captured via closure (not read off the recharts props
+// object), which keeps the returned renderer's prop type limited to exactly
+// what <Customized> supplies -- avoiding the "missing dataX/dataY" type
+// error that comes from declaring them as required props on that callback.
+function createChartAnnotationRenderer(
+  dataX: number,
+  dataY: number,
+): (props: CustomizedLayerProps) => React.ReactElement | null {
+  return function ChartAnnotationLayer({
+    xAxisMap,
+    yAxisMap,
+  }: CustomizedLayerProps): React.ReactElement | null {
+    if (!xAxisMap || !yAxisMap) return null;
 
-  const cx = xAxis.scale(dataX);
-  const cy = yAxis.scale(dataY);
+    const xAxisKey = Object.keys(xAxisMap)[0];
+    const yAxisKey = Object.keys(yAxisMap)[0];
+    const xAxis = xAxisKey ? xAxisMap[xAxisKey] : undefined;
+    const yAxis = yAxisKey ? yAxisMap[yAxisKey] : undefined;
+    if (!xAxis || !yAxis) return null;
 
-  return <CustomAnnotation cx={cx} cy={cy} />;
+    const cx = xAxis.scale(dataX);
+    const cy = yAxis.scale(dataY);
+
+    return <CustomAnnotation cx={cx} cy={cy} />;
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export function ConstructionVsComplaintsChart() {
+export function ConstructionVsComplaintsChart(): React.ReactElement {
   return (
     <div className="w-full mx-auto font-sans bg-white">
       <div className="px-4 sm:px-6 md:px-10 lg:px-20 xl:px-24 pb-6 pt-8">
@@ -314,7 +356,7 @@ export function ConstructionVsComplaintsChart() {
 
                 {/* Scatter Points overlay */}
                 <Scatter data={data} shape="circle">
-                  {data.map((entry, index) => (
+                  {data.map((entry: BubblePoint, index: number) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={getAqiColor(entry.averageAQI)}
@@ -333,9 +375,7 @@ export function ConstructionVsComplaintsChart() {
 
                 {/* Custom Annotation matching the reference image precisely */}
                 <Customized
-                  component={(props) => (
-                    <ChartAnnotationLayer {...props} dataX={152} dataY={845} />
-                  )}
+                  component={createChartAnnotationRenderer(152, 845)}
                 />
               </ScatterChart>
             </ResponsiveContainer>
