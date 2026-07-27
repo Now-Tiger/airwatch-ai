@@ -2,7 +2,6 @@
 "use client";
 
 import { ConstructionActivityBubbleChart } from "@/components/analytics/ConstructionActivityBubbleChart";
-import { ConstructionVsComplaintsChart } from "@/components/analytics/ConstructionComplaintsChart";
 import { PlumeSensorLagHeatmap } from "@/components/analytics/PlumnSensorLag";
 import { MicroHotspotMapComponent } from "@/components/analytics/MicroHotspotMap";
 import { GrapEfficacyApportionmentChart } from "@/components/analytics/GrapEfficacyApportionment";
@@ -21,7 +20,6 @@ export default function Dashboard(): React.JSX.Element {
       <AqiTransitionSankeyChart />
 
       <ConstructionActivityBubbleChart />
-      <ConstructionVsComplaintsChart />
     </div>
   );
 }
